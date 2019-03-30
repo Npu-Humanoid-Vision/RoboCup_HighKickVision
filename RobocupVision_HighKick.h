@@ -13,12 +13,12 @@ using namespace cv;
 #ifdef ADJUST_PARAMETER // need asj
 
 // showing image in debugging 
-#define SHOW_IMAGE(imgName) \
-    namedWindow("imgName", WINDOW_AUTOSIZE); \
-    moveWindow("imgName", 300, 300); \
-    imshow("imgName", imgName); \
-    waitKey(5000); \
-    destroyWindow("imgName"); \
+#define SHOW_IMAGE(window_name, imgName) \
+    namedWindow(window_name, WINDOW_AUTOSIZE); \
+    moveWindow(window_name, 300, 300); \
+    imshow(window_name, imgName); \
+    waitKey(2000); \
+    destroyWindow(window_name); \
 
 
 class ImgProcResult{
@@ -50,7 +50,7 @@ protected:
 
 #endif 
 
-class RobocupResult : public ImgProcResult {
+class RobocupResult_HK : public ImgProcResult {
 public: // data menber
     // sideline detection relate
     bool sideline_valid_;
@@ -60,19 +60,19 @@ public: // data menber
     cv::Point2i sideline_end_;
 
 public:
-    RobocupResult() {
+    RobocupResult_HK() {
         sideline_valid_ = false;
     }
 
     virtual void operator=(ImgProcResult& res) {
-        RobocupResult* tmp  = dynamic_cast<RobocupResult*>(&res);
+        RobocupResult_HK* tmp  = dynamic_cast<RobocupResult_HK*>(&res);
         
         sideline_valid_     = tmp->sideline_valid_;
         sideline_slope_     = tmp->sideline_slope_;
         sideline_center_    = tmp->sideline_center_; 
     }
 
-    void operator=(RobocupResult& res) {
+    void operator=(RobocupResult_HK& res) {
         sideline_valid_     = res.sideline_valid_;
         sideline_slope_     = res.sideline_slope_;
         sideline_center_    = res.sideline_center_;
@@ -108,9 +108,9 @@ struct AllParameters {
 
 enum {H, S, V, L, A, B};
 
-class RobocupVision : public ImgProc {
+class RobocupVision_HK : public ImgProc {
 public:
-    RobocupVision();
+    RobocupVision_HK();
 
 public:
     void imageProcess(cv::Mat input_image, ImgProcResult* output_result);   // external interface
@@ -119,7 +119,7 @@ public:
 
     cv::Mat GetUsedChannel(cv::Mat& src_img, int flag);
 
-    cv::Mat ProcessSidelineColor();                                         // get the line binary image
+    cv::Mat MorTreate(cv::Mat binary_image);
 
     std::vector<cv::Vec2f> StandardHough(cv::Mat binary_image);             // standard hough line
 
@@ -141,7 +141,9 @@ public: // data menbers
     cv::Mat pretreated_image_;      // the after-enhancement src image 
     
     // for ProcessXColor
+    cv::Mat sideline_used_channel_;
     cv::Mat sideline_binary_image_;
+    cv::Mat sideline_mor_treated_binary_image_;
     int sideline_min_;
     int sideline_max_;
     int sideline_hori_kernal_size_;
@@ -156,7 +158,7 @@ public: // data menbers
     int max_file_num_;
 
     // result & etc
-    RobocupResult final_result_;
+    RobocupResult_HK final_result_;
 };  
 
 #endif

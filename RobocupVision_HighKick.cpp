@@ -1,9 +1,34 @@
 #include "RobocupVision_HighKick.h"
 
-RobocupVision::RobocupVision() {
+RobocupVision_HK::RobocupVision_HK() {
     start_file_num_ = 0;
     max_file_num_   = 500;
     LoadEverything();
+}
+
+void RobocupVision_HK::imageProcess(cv::Mat input_image, ImgProcResult* output_result) {
+    // pretreate image
+    pretreated_image_ = Pretreat(input_image);
+
+    // sideline thre
+    sideline_used_channel_  = GetUsedChannel(pretreated_image_, L);
+    sideline_binary_image_ = sideline_used_channel_>sideline_min_ & sideline_used_channel_<sideline_max_;
+
+    // mor treat
+    sideline_mor_treated_binary_image_ = MorTreate(sideline_binary_image_);
+
+    lines_ = StandardHough(sideline_mor_treated_binary_image_);
+
+    // judge line result
+
+    // dynamic cast 
+    (*dynamic_cast<RobocupResult_HK*>(output_result)) = final_result_;
+#undef ADJUST_PARAMETER
+#ifndef ADJUST_PARAMETER
+    WriteImg(src_image_, "src_img", start_file_num_);
+    // paint result on the src_image_ before being written
+    WriteImg(src_image_, "center_img", start_file_num_++);
+#endif
 }
 
 void RobocupVision::imageProcess(cv::Mat input_image, ImgProcResult* output_result) {
