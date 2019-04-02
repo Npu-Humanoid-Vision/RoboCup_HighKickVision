@@ -7,19 +7,20 @@
 #include <fstream> 
 #include <iostream>
 #include <iomanip>
+#include <algorithm>
+#include <numeric>
 using namespace std;
 using namespace cv;
+
+enum {H, S, V, L, A, B};
 
 #ifdef ADJUST_PARAMETER // need asj
 
 // showing image in debugging 
-#define SHOW_IMAGE(window_name, imgName) \
+#define SHOW_IMAGE(window_name, img) \
     namedWindow(window_name, WINDOW_AUTOSIZE); \
-    moveWindow(window_name, 300, 300); \
-    imshow(window_name, imgName); \
-    waitKey(2000); \
-    destroyWindow(window_name); \
-
+    imshow(window_name, img); \
+    waitKey(1); \
 
 class ImgProcResult{
 
@@ -46,7 +47,7 @@ protected:
 #else
 
 #include "imgproc.h"
-#define SHOW_IMAGE(imgName) ;
+#define SHOW_IMAGE(window_name, img) ;
 
 #endif 
 
@@ -54,10 +55,8 @@ class RobocupResult_HK : public ImgProcResult {
 public: // data menber
     // sideline detection relate
     bool sideline_valid_;
-    double sideline_slope_;
+    double sideline_angle_;
     cv::Point2i sideline_center_;
-    cv::Point2i sideline_begin_;
-    cv::Point2i sideline_end_;
 
 public:
     RobocupResult_HK() {
@@ -68,18 +67,18 @@ public:
         RobocupResult_HK* tmp  = dynamic_cast<RobocupResult_HK*>(&res);
         
         sideline_valid_     = tmp->sideline_valid_;
-        sideline_slope_     = tmp->sideline_slope_;
+        sideline_angle_     = tmp->sideline_angle_;
         sideline_center_    = tmp->sideline_center_; 
     }
 
     void operator=(RobocupResult_HK& res) {
         sideline_valid_     = res.sideline_valid_;
-        sideline_slope_     = res.sideline_slope_;
+        sideline_angle_     = res.sideline_angle_;
         sideline_center_    = res.sideline_center_;
     }
 };
 
-struct AllParameters {
+struct AllParameters_HK {
     // preproc relate
     int gaus_kernal_size;
 
@@ -95,18 +94,17 @@ struct AllParameters {
     // feel comfortable from Alex Beng !
     template<typename XXX>
     void operator=(XXX& robocup_vision) {
-        int gaus_kernal_size;
+        gaus_kernal_size = robocup_vision.gaus_kernal_size_;
 
-        int sideline_min;
-        int sideline_max;
-        int sideline_hori_kernal_size;
+        sideline_min = robocup_vision.sideline_min_;
+        sideline_max = robocup_vision.sideline_max_;
+        sideline_hori_kernal_size = robocup_vision.sideline_hori_kernal_size_;
 
-        int mor_kernal_size;
-        int line_vote_thre;
+        mor_kernal_size = robocup_vision.mor_kernal_size_;
+        line_vote_thre = robocup_vision.line_vote_thre_;
     }
 };
 
-enum {H, S, V, L, A, B};
 
 class RobocupVision_HK : public ImgProc {
 public:
@@ -115,20 +113,20 @@ public:
 public:
     void imageProcess(cv::Mat input_image, ImgProcResult* output_result);   // external interface
     
-    cv::Mat Pretreat(cv::Mat raw_image);                                    // all pretreatment, image enhancement for the src_image and etc
-
     cv::Mat GetUsedChannel(cv::Mat& src_img, int flag);
 
     cv::Mat MorTreate(cv::Mat binary_image);
 
-    std::vector<cv::Vec2f> StandardHough(cv::Mat binary_image);             // standard hough line
+    std::vector<cv::Vec2f> StandardHough(cv::Mat mor_gradiant);             // standard hough line
+    // return vec2f[0] mean lines' rho 
+    // vec2f[1] mean lines' theta
 
 public:
     void LoadEverything();                                                  // load parameters from the file AS WELL AS the SVM MODEL !!!!
 
     void StoreParameters();                                                 // Store parameters to file
 
-    void set_all_parameters(AllParameters ap);                              // when setting parameters in main.cpp
+    void set_all_parameters(AllParameters_HK ap);                              // when setting parameters in main.cpp
 
     void WriteImg(cv::Mat src, string folder_name, int num);                // while running on darwin, save images
 
@@ -160,5 +158,6 @@ public: // data menbers
     // result & etc
     RobocupResult_HK final_result_;
 };  
+
 
 #endif
