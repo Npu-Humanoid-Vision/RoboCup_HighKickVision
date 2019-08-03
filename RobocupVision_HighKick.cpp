@@ -1,7 +1,5 @@
 #include "RobocupVision_HighKick.h"
 
-
-
 RobocupVision_HK::RobocupVision_HK() {
     start_file_num_ = 0;
     max_file_num_   = 500;
@@ -24,7 +22,61 @@ void RobocupVision_HK::imageProcess(cv::Mat input_image, ImgProcResult* output_r
     // mor treat
     sideline_mor_treated_binary_image_ = MorTreate(sideline_binary_image_);
 
-    lines_ = StandardHough(sideline_mor_treated_binary_image_);
+    PbbHough(sideline_mor_treated_binary_image_, segments_);
+
+    // std::vector<bool> nms_flags;
+    // std::vector<cv::Vec4i> final_segs;
+    // std::vector<double> final_segs_angle;
+    cv::Vec4i max_seg;
+    if (segments_.size() == 0) {
+        final_result_.sideline_valid_ = false;
+        max_seg = cv::Vec4i(0,0,0,0);
+    }
+    else {
+        final_result_.sideline_valid_ = true;
+        
+        double angle;
+        double max_len = 0;
+        for (int i=0; i<segments_.size(); i++) {
+            if (segments_[i][0] == segments_[i][2]) {
+                angle = 90;
+            }
+            else {
+                double dx = segments_[i][0]-segments_[i][2]; 
+                double dy = segments_[i][1]-segments_[i][3];
+                angle = atan(dy/dx);
+                if (angle < 0) {
+                    angle += 180;
+                }
+                // cout<<angle<<endl;
+                if (angle > 135 || angle < 45) {
+                    double t_len = sqrt(dx*dx + dy*dy);
+                    // cout<<t_len<<t_len<<endl;
+                    if (t_len > max_len) {
+                        max_len = t_len;
+                        // cout<<"yaya"<<endl;
+                        max_seg = segments_[i];
+                        // cout<<"ya"<<max_seg<<endl;
+                        final_result_.sideline_angle_ = angle;
+                        final_result_.sideline_center_ = cv::Point2i(
+                            segments_[i][0] + 0.5*dx,
+                            segments_[i][1] + 0.5*dy
+                        );
+                    }
+                    // final_segs.push_back(segments_[i]);
+                    // final_segs_angle.push_back(angle);
+                }
+
+            }
+        }      
+        // ABORT NMS !
+        // SegmentNms(final_segs, nms_flags, nms_thre_);
+    }
+
+
+#ifdef ROBOCUP
+    StandardHough(sideline_mor_treated_binary_image_, lines_);
+
 
     std::vector<cv::Vec3f> final_lines;
     cv::Vec3f  t_vec;
@@ -103,14 +155,22 @@ void RobocupVision_HK::imageProcess(cv::Mat input_image, ImgProcResult* output_r
 
         SHOW_IMAGE("final_line_result", for_line_result);
     }
-    
+#endif    
 
     // dynamic cast 
     (*dynamic_cast<RobocupResult_HK*>(output_result)) = final_result_;
 
-#ifndef ADJUST_PARAMETER
+#ifdef ADJUST_PARAMETER
     WriteImg(src_image_, "src_img", start_file_num_);
     // paint result on the src_image_ before being written
+    for (int i=0; i<segments_.size(); i++) {
+        cv::line(src_image_, cv::Point(segments_[i][0], segments_[i][1]), cv::Point(segments_[1][2], segments_[i][3]), cv::Scalar(0, 0, 255));        
+    }
+    // cout<<max_seg<<endl;
+    if (final_result_.sideline_valid_) {
+        cv::line(src_image_, cv::Point(max_seg[0], max_seg[1]), cv::Point(max_seg[2], max_seg[3]), cv::Scalar(0, 255, 0), 3);
+    }
+    SHOW_IMAGE("result", src_image_);
     WriteImg(src_image_, "center_img", start_file_num_++);
 #endif
 }
@@ -149,10 +209,13 @@ cv::Mat RobocupVision_HK::MorTreate(cv::Mat binary_image) {
     return mor_gradiant;
 }
 
-std::vector<cv::Vec2f> RobocupVision_HK::StandardHough(cv::Mat mor_gradiant) {
-    std::vector<cv::Vec2f> lines;
+void RobocupVision_HK::StandardHough(cv::Mat mor_gradiant, std::vector<cv::Vec2f>& lines) {
     HoughLines(mor_gradiant, lines, 1, CV_PI/180, line_vote_thre_, 0, 0);
-    return lines;
+    return ;
+}
+
+void RobocupVision_HK::PbbHough(cv::Mat binary_image, std::vector<cv::Vec4i>& lines) {
+    HoughLinesP(binary_image, lines, 1, CV_PI/180, line_vote_thre_, 0, 0);
 }
 
 void RobocupVision_HK::LoadEverything() {
@@ -243,3 +306,41 @@ void RobocupVision_HK::WriteImg(cv::Mat src, string folder_name, int num) {
         cv::imwrite(path, src);
     }
 }
+
+// void RobocupVision_HK::SegmentNms(std::vector<cv::Vec4i>& segments_in, std::vector<bool>& out_flags, double nms_thre) {
+//     sort(segments_in.begin(), segments_in.end(), SortSegments);
+
+//     for (size_t i=0; i<segments_in.size(); i++) {
+//         for (size_t j=0; j<segments_in.size(); j++) {
+//             if (SegmentsIou(segments_in[i], segments_in[j]) < nms_thre) {
+//                 out_flags[j] = false;
+//             }
+//         }
+//     }
+// }
+
+// bool RobocupVision_HK::SortSegments(cv::Vec4i s_1, cv::Vec4i s_2) {
+//     double len_1 = sqrt(
+//         (s_1[0]-s_1[2])*(s_1[0]-s_1[2]) 
+//     +   (s_1[1]-s_1[3])*(s_1[1]-s_1[3])  
+//     );
+//     double len_2 = sqrt(
+//         (s_2[0]-s_2[2])*(s_2[0]-s_2[2]) 
+//     +   (s_2[1]-s_2[3])*(s_2[1]-s_2[3])  
+//     );
+
+//     return len_1 >= len_2;
+// }
+
+// double RobocupVision_HK::SegmentsIou(cv::Vec4i s_1, cv::Vec4i s_2) {
+//     cv::Point2f mid_1(
+//         (s_1[0]-s_1[2])/2.,
+//         (s_1[1]-s_1[3])/2.
+//     );
+//     cv::Point2f mid_2(
+//         (s_2[0]-s_2[2])/2.,
+//         (s_2[1]-s_2[3])/2.
+//     );
+
+//     return sqrt((mid_1.x-mid_2.x)*(mid_1.x-mid_2.x) + (mid_1.y-mid_2.y)*(mid_1.y-mid_2.y));
+// }

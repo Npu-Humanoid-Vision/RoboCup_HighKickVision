@@ -18,7 +18,7 @@ enum {H, S, V, L, A, B};
 
 // showing image in debugging 
 #define SHOW_IMAGE(window_name, img) \
-    namedWindow(window_name, WINDOW_AUTOSIZE); \
+    namedWindow(window_name, WINDOW_NORMAL); \
     imshow(window_name, img); \
     waitKey(1); \
 
@@ -117,9 +117,14 @@ public:
 
     cv::Mat MorTreate(cv::Mat binary_image);
 
-    std::vector<cv::Vec2f> StandardHough(cv::Mat mor_gradiant);             // standard hough line
+    void StandardHough(cv::Mat mor_gradiant, std::vector<cv::Vec2f>&);             // standard hough line
     // return vec2f[0] mean lines' rho 
     // vec2f[1] mean lines' theta
+
+    void PbbHough(cv::Mat binary_image, std::vector<cv::Vec4i>&);                   // probabilistic Hough transform
+    // 两端
+    // Point(lines[i][0], lines[i][1]),
+    // Point(lines[i][2], lines[i][3]) 
 
 public:
     void LoadEverything();                                                  // load parameters from the file AS WELL AS the SVM MODEL !!!!
@@ -129,6 +134,15 @@ public:
     void set_all_parameters(AllParameters_HK ap);                              // when setting parameters in main.cpp
 
     void WriteImg(cv::Mat src, string folder_name, int num);                // while running on darwin, save images
+
+    void SegmentNms(std::vector<cv::Vec4i>& segments_in, std::vector<bool>& out_flags, double nms_thre); 
+    // nms for segment scoring in length & iou in position 
+
+    // For NMS
+    bool SortSegments(cv::Vec4i s_1, cv::Vec4i s_2);    // for stl's sort
+
+    // For iou
+    double SegmentsIou(cv::Vec4i s_1, cv::Vec4i s_2);
 
 public: // data menbers
     // father of everything
@@ -150,10 +164,14 @@ public: // data menbers
     int mor_kernal_size_;
     int line_vote_thre_;
     std::vector<cv::Vec2f> lines_;
+    std::vector<cv::Vec4i> segments_;
 
     // for WriteImg
     int start_file_num_;
     int max_file_num_;
+
+    // for nms
+    // int nms_thre_;
 
     // result & etc
     RobocupResult_HK final_result_;
